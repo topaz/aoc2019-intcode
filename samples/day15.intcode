@@ -1,0 +1,100 @@
+mainloop:
+in dir
+
+eq dir 1 tmp
+jt tmp &dir_up
+eq dir 2 tmp
+jt tmp &dir_down
+eq dir 3 tmp
+jt tmp &dir_left
+eq dir 4 tmp
+jt tmp &dir_right
+hlt
+
+dir_up:
+@cpy player_x test_x
+@cpy player_xp test_xp
+add player_y -1 test_y
+eq player_yp 0 test_yp
+mul -1 test_yp tmp
+add player_yh tmp test_yh
+@jmp &pos_type
+
+dir_down:
+@cpy player_x test_x
+@cpy player_xp test_xp
+add player_y 1 test_y
+eq player_yp 0 test_yp
+add player_yh player_yp test_yh
+@jmp &pos_type
+
+dir_left:
+add player_x -1 test_x
+eq player_xp 0 test_xp
+@cpy player_y test_y
+@cpy player_yp test_yp
+@cpy player_yh test_yh
+@jmp &pos_type
+
+dir_right:
+add player_x 1 test_x
+eq player_xp 0 test_xp
+@cpy player_y test_y
+@cpy player_yp test_yp
+@cpy player_yh test_yh
+#@jmp &pos_type
+
+pos_type:
+jf test_x &pos_type_ret_wall
+jf test_y &pos_type_ret_wall
+eq test_x 40 tmp
+jt tmp &pos_type_ret_wall
+eq test_y 40 tmp
+jt tmp &pos_type_ret_wall
+
+eq test_x 39 tmp
+jf tmp &pos_type_not_target
+eq test_y 3 tmp
+jf tmp &pos_type_not_target
+@cpy 2 test_result
+@jmp &pos_type_ret
+pos_type_not_target:
+
+mul test_xp test_yp tmp
+jf tmp &pos_type_nontrivial
+@cpy 1 test_result
+@jmp &pos_type_ret
+pos_type_nontrivial:
+
+add test_xp test_yp tmp
+jf tmp &pos_type_ret_wall
+
+# door_lookup[(yh+yp-1)*(grid_xmax-1) + x-1]
+add test_yh test_yp tmp
+add tmp -1 tmp
+mul tmp 39 tmp
+add tmp test_x tmp
+add -1 tmp tmp
+add &door_lookup tmp pos_type_door_lookup_addr
+lt pos_type_door_lookup_addr:*0 58 test_result
+@jmp &pos_type_ret
+
+pos_type_ret_wall:
+@cpy 0 test_result
+@jmp &pos_type_ret
+
+pos_type_ret:
+jf test_result &player_update_done
+@cpy test_x player_x
+@cpy test_y player_y
+@cpy test_xp player_xp
+@cpy test_yp player_yp
+@cpy test_yh player_yh
+player_update_done:
+
+out test_result
+@jmp &mainloop
+
+@raw door_lookup:61 46 60 38 63 39 51 19 10 15 63 47 69 32 88 67 48 4 75 23 22 74 84 42 99 4 16 4 88 24 6 94 18 46 57 34 64 34 14 54 24 62 8 68 14 93 74 73 91 39 25 93 33 93 40 96 65 30 2 97 68 33 4 24 98 26 61 75 53 87 99 16 83 88 57 45 76 92 19 51 86 42 97 18 66 21 38 67 69 33 71 17 5 14 80 93 45 64 13 54 75 91 33 82 59 11 81 35 16 81 71 37 51 64 70 8 26 10 99 48 71 7 24 1 93 74 1 35 71 26 49 83 77 21 41 87 60 98 47 20 89 72 41 67 40 25 89 22 90 46 38 80 67 16 26 9 28 86 96 23 74 90 35 36 72 91 16 73 1 62 18 93 78 9 96 21 56 89 12 96 57 26 89 35 86 11 56 72 45 81 28 31 69 91 17 45 62 26 39 60 10 21 98 56 33 64 62 7 98 48 20 72 44 28 97 28 63 57 61 82 96 16 54 4 64 55 75 3 60 13 85 21 88 43 84 6 64 88 37 29 79 70 93 5 31 89 83 18 70 72 25 57 88 69 11 97 17 54 56 90 19 67 37 97 5 78 2 82 27 91 24 43 72 54 45 65 32 99 37 95 57 91 70 87 15 14 81 50 33 91 96 38 29 84 75 43 67 86 17 90 97 34 63 78 93 28 64 10 76 67 5 62 25 62 48 86 53 52 70 21 80 18 83 23 12 61 79 13 3 78 99 20 38 80 92 8 94 13 34 59 91 6 73 5 85 63 89 53 95 18 53 73 55 7 59 6 97 48 45 26 13 46 91 95 35 55 83 27 96 55 15 92 82 68 17 19 39 86 73 24 2 39 78 56 7 92 20 19 95 37 43 74 36 83 28 94 90 83 9 69 78 65 50 30 66 85 54 79 39 66 79 24 20 61 32 59 5 96 44 95 43 81 61 8 24 85 91 52 85 5 43 62 90 67 47 41 75 51 54 93 55 98 74 36 46 73 68 26 64 49 49 71 86 57 95 8 95 57 76 24 42 61 95 72 34 96 38 11 73 35 44 88 47 83 3 85 77 16 91 90 5 46 73 63 22 70 69 31 88 92 55 33 77 77 83 15 81 60 27 38 51 36 83 28 13 90 42 71 19 78 22 68 82 27 67 34 5 61 23 73 61 51 52 80 57 26 12 19 75 17 84 12 12 74 3 34 83 15 95 20 75 89 25 97 82 46 19 31 90 20 4 96 6 85 44 66 37 19 92 26 92 64 32 54 96 64 18 98 63 20 67 88 23 80 54 98 83 87 71 29 18 75 44 8 71 43 66 51 98 65 21 41 65 5 93 73 70 17 28 86 15 77 64 35 79 11 86 12 10 25 59 94 47 72 4 92 22 66 51 56 81 79 10 54 49 96 11 54 95 83 11 95 97 7 24 96 64 41 62 16 5 72 71 28 52 71 43 65 88 56 62 15 38 86 71 34 85 21 98 73 31 27 12 56 91 68 19 17 39 74 15 61 98 98 13 70 11 39 64 60 31 21 79 97 11 71 69 84 29 35 77 57 82 6 34 62 56 87 42 96 96 34 28 36 23 88 83 67 37 48 62 23 41 38 86 98 90 17 30 92 69 20 84 10 73 48 47 90 19 64 44 85 87 43 53 73 31 52 64 69 19 81 70 93 4 77 9 83 11 99 78 91 6 84 52 78 16 68 16 63 52 66 35 97 22 72 94 86 22 59 42 97 43 78 67 95 31 85 53 74
+
+@raw tmp:0 dir:0 player_x:21 player_y:21 player_xp:1 player_yh:10 player_yp:1 test_x:0 test_y:0 test_xp:0 test_yh:0 test_yp:0 test_result:0

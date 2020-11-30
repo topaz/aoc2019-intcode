@@ -1,0 +1,45 @@
+# this file just tests various macros (and shows off some recursion in the process)
+# it'll ask for a number, calculate its factorial, ask for a second number, and calculate that Nth fibonacci number
+
+rbo &auto__end
+@cpy a b
+@jmp &c
+c:
+in ~1
+@call &factorial
+out ~1
+in ~1
+@call &fib
+out ~1
+hlt
+@raw a:0 b:0 tmp:0
+
+@fn 1 factorial(n) global(tmp)
+  # if n=1, return 1
+  # return n * factorial(n-1)
+  eq n 1 tmp
+  jt tmp &basecase
+    add n -1 ~1
+    @call &factorial
+    mul n ~1 return0
+    @jmp &return
+  basecase:
+    @cpy 1 return0
+  return:
+@endfn
+
+@fn 1 fib(n) local(a) global(tmp)
+  # if n < 2, return n
+  lt n 2 tmp
+  jt tmp &basecase
+    add n -1 ~1
+    @call &fib
+    @cpy ~1 a
+    add n -2 ~1
+    @call &fib
+    add ~1 a return0
+    @jmp &return
+  basecase:
+    @cpy n return0
+  return:
+@endfn

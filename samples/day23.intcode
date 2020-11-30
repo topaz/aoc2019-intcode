@@ -1,0 +1,688 @@
+in tmp
+add tmp &jumptable_base jumptable_addr
+rbo &auto__end
+jt 1 jumptable_addr:*0
+@raw jumptable_base:&node_FMKLPDUD &node_YKJBHDLR &node_KGCRTBKS &node_USJFRJGI &node_DPMRMZXY &node_ADTGYUJP &node_TRCZDKKE &node_EUJVVXOF &node_NZHQNGSJ &node_OZKHBFDD &node_MFXCAOQF &node_EWCHJNNC &node_MAZTERTD &node_ZOQGLTLK &node_RWHOZHQI &node_IWFDXHPB &node_PYUKMSUS &node_HUHKSJUM &node_GNSGUDPI &node_KZECTSWA &node_CCNTGEUI &node_UOSLWXXT &node_PHEPEQFX &node_RRJBYIVF &node_GLISRJRS &node_KUPDPQGA &node_CAXKJTYL &node_BTPXCPTY &node_VQPKLSNN &node_GMNNXIYD &node_YOZURPZL &node_BMDQPHCF &node_FRVWOLLO &node_YKACNHBP &node_WMGFSCPK &node_EZWROFYJ &node_NSFKTMDZ &node_MVJHSHKD &node_HBKSNAEW &node_BOMMKQFD &node_LHLEJKTI &node_LYLUMECL &node_ENMDRSQZ &node_UISZBTVL &node_NIUEHHKG &node_RWZRAXLH &node_RKHWMQPP &node_FNZPQQKE &node_YPWLNLLX &node_LZFYUOHE
+
+@raw initialized:0 tmp:0 i:0 in_port:0 in_val:0 port_mul:0 portnum:0 ports_addr:0 logic_addr:0 output_value:0 outputnum:0 outputs_addr:0
+
+run_node:
+  run_node_input:
+  # get input
+  in in_port
+  # - if input, keep reading
+  eq in_port -1 tmp
+  jf tmp &run_node_input_keep_reading
+  # - if never initialized, skip to recalculate
+  jf initialized &run_node_recalculate
+  # - otherwise, no input and nothing to do, start over
+  @jmp &run_node_input
+  # - if input, get value and validate everything
+  run_node_input_keep_reading:
+  in in_val
+  @cpy in_port ~1
+  @cpy port_mul ~2
+  @call &intdiv
+  add ~1 -1 in_port
+  lt in_port 0 tmp
+  jt tmp &run_node_input
+  lt in_port portnum tmp
+  jf tmp &run_node_input
+  # - if same as old value, read more input
+  mul in_port 2 port_read_ready_addr
+  add port_read_ready_addr ports_addr port_read_ready_addr
+  @cpy port_read_ready_addr:*0 tmp
+  add port_read_ready_addr 1 port_read_value_addr
+  eq port_read_value_addr:*0 in_val i
+  mul i tmp tmp
+  jt tmp &run_node_input
+  # - otherwise, new value; write and continue to recalculate
+  mul in_port 2 port_write_ready_addr
+  add port_write_ready_addr ports_addr port_write_ready_addr
+  @cpy 1 port_write_ready_addr:*0
+  add port_write_ready_addr 1 port_write_value_addr
+  @cpy in_val port_write_value_addr:*0
+
+  run_node_recalculate:
+  # recalculate output value
+  # - set initialized=true
+  @cpy 1 initialized
+  # - if all inputs available, calculate output, set output ready
+  @cpy 0 i
+  outready_loop:
+    lt i portnum tmp
+    jf tmp &outready_done
+
+    mul i 2 outready_read_addr
+    add ports_addr outready_read_addr outready_read_addr
+    jf outready_read_addr:*0 &run_node_input
+
+    add i 1 i
+  @jmp &outready_loop
+  outready_done:
+  @call logic_addr
+  @cpy ~1 output_value
+
+  #run_node_output:
+  # output
+  # - send to recipients
+  @cpy 0 i
+  output_loop:
+    lt i outputnum tmp
+    jf tmp &output_done
+
+    mul i 2 output_read_host_addr
+    add outputs_addr output_read_host_addr output_read_host_addr
+    out output_read_host_addr:*0
+    add 1 output_read_host_addr output_read_port_addr
+    out output_read_port_addr:*0
+    out output_value
+
+    add i 1 i
+  @jmp &output_loop
+  output_done:
+@jmp &run_node
+
+@fn 1 logicfn_add() local(rv, i, tmp) global(portnum, ports_addr)
+  @cpy 0 rv
+
+  @cpy 0 i
+  loop:
+    lt i portnum tmp
+    jf tmp &return
+
+    mul i 2 read_addr
+    add 1 read_addr read_addr
+    add ports_addr read_addr read_addr
+    add read_addr:*0 rv rv
+
+    add i 1 i
+  @jmp &loop
+
+  return:
+  @cpy rv return0
+@endfn
+
+@fn 1 logicfn_mul() local(rv, i, tmp) global(portnum, ports_addr)
+  @cpy 1 rv
+
+  @cpy 0 i
+  loop:
+    lt i portnum tmp
+    jf tmp &return
+
+    mul i 2 read_addr
+    add 1 read_addr read_addr
+    add ports_addr read_addr read_addr
+    mul read_addr:*0 rv rv
+
+    add i 1 i
+  @jmp &loop
+
+  return:
+  @cpy rv return0
+@endfn
+
+@fn 1 logicfn_intdiv() global(ports_addr, intdiv)
+  add 1 ports_addr n_addr
+  @cpy n_addr:*0 ~1
+  add 3 ports_addr d_addr
+  @cpy d_addr:*0 ~2
+  @call &intdiv
+  @cpy ~1 return0
+@endfn
+
+@raw pow2_table:1 2 4 8 16 32 64 128 256 512 1024 2048 4096 8192 16384 32768 65536 131072 262144 524288 1048576 2097152 4194304 8388608 16777216 33554432 67108864 134217728 268435456 536870912 1073741824 2147483648 4294967296 8589934592 17179869184 34359738368 68719476736 137438953472 274877906944 549755813888 1099511627776 2199023255552 4398046511104 8796093022208 17592186044416 35184372088832 70368744177664 140737488355328 281474976710656 562949953421312 1125899906842624
+
+@fn 1 intdiv(n,d) local(tmp, q, r, i, cur_pow2) global(pow2_table)
+  mul d 10 tmp
+  lt n tmp tmp
+  jt tmp &intdiv_linear
+
+  @cpy 0 q
+  @cpy 0 r
+  @cpy 51 i
+  long_loop:
+    add i -1 i
+    # i = 50..0
+
+    add i &pow2_table pow2_read_addr
+    @cpy pow2_read_addr:*0 cur_pow2
+
+    mul r 2 r
+
+    lt n cur_pow2 tmp
+    jt tmp &n_adj_done
+      add r 1 r
+      mul -1 cur_pow2 tmp
+      add n tmp n
+    n_adj_done:
+
+    lt r d tmp
+    jt tmp &q_adj_done
+      mul -1 d tmp
+      add r tmp r
+      add cur_pow2 q q
+    q_adj_done:
+
+  jt i &long_loop
+  @jmp &return
+
+  intdiv_linear:
+  @cpy -1 q
+  mul d -1 d
+  linear_loop:
+  lt n 0 tmp
+  jt tmp &return
+    add n d n
+    add q 1 q
+  @jmp &linear_loop
+
+  return:
+  @cpy q return0
+@endfn
+
+@fn 1 logicfn_copy() global(ports_addr)
+  add 1 ports_addr read_addr
+  @cpy read_addr:*0 return0
+@endfn
+node_KZECTSWA:
+  @cpy 26783 port_mul
+  @cpy 1 portnum
+  @cpy &node_KZECTSWA_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_KZECTSWA_outputs outputs_addr
+@jmp &run_node
+@raw node_KZECTSWA_ports:1 160
+@raw node_KZECTSWA_outputs:29 306942
+node_USJFRJGI:
+  @cpy 26293 port_mul
+  @cpy 1 portnum
+  @cpy &node_USJFRJGI_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 3 outputnum
+  @cpy &node_USJFRJGI_outputs outputs_addr
+@jmp &run_node
+@raw node_USJFRJGI_ports:1 5
+@raw node_USJFRJGI_outputs:23 176942 23 265413 29 51157
+node_ADTGYUJP:
+  @cpy 21499 port_mul
+  @cpy 1 portnum
+  @cpy &node_ADTGYUJP_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_ADTGYUJP_outputs outputs_addr
+@jmp &run_node
+@raw node_ADTGYUJP_ports:1 109
+@raw node_ADTGYUJP_outputs:15 123908
+node_ENMDRSQZ:
+  @cpy 26573 port_mul
+  @cpy 1 portnum
+  @cpy &node_ENMDRSQZ_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_ENMDRSQZ_outputs outputs_addr
+@jmp &run_node
+@raw node_ENMDRSQZ_ports:1 12
+@raw node_ENMDRSQZ_outputs:10 161132
+node_UISZBTVL:
+  @cpy 63361 port_mul
+  @cpy 1 portnum
+  @cpy &node_UISZBTVL_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 0 outputnum
+  @cpy &node_UISZBTVL_outputs outputs_addr
+@jmp &run_node
+@raw node_UISZBTVL_ports:1 1628
+@raw node_UISZBTVL_outputs:
+node_NZHQNGSJ:
+  @cpy 10453 port_mul
+  @cpy 1 portnum
+  @cpy &node_NZHQNGSJ_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 0 outputnum
+  @cpy &node_NZHQNGSJ_outputs outputs_addr
+@jmp &run_node
+@raw node_NZHQNGSJ_ports:1 1058
+@raw node_NZHQNGSJ_outputs:
+node_YOZURPZL:
+  @cpy 10691 port_mul
+  @cpy 3 portnum
+  @cpy &node_YOZURPZL_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_YOZURPZL_outputs outputs_addr
+@jmp &run_node
+@raw node_YOZURPZL_ports:0 0 0 0 0 0
+@raw node_YOZURPZL_outputs:32 84299
+node_NIUEHHKG:
+  @cpy 1063 port_mul
+  @cpy 1 portnum
+  @cpy &node_NIUEHHKG_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_NIUEHHKG_outputs outputs_addr
+@jmp &run_node
+@raw node_NIUEHHKG_ports:1 167
+@raw node_NIUEHHKG_outputs:10 80566
+node_EUJVVXOF:
+  @cpy 17489 port_mul
+  @cpy 1 portnum
+  @cpy &node_EUJVVXOF_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 2 outputnum
+  @cpy &node_EUJVVXOF_outputs outputs_addr
+@jmp &run_node
+@raw node_EUJVVXOF_ports:1 10
+@raw node_EUJVVXOF_outputs:23 88471 29 153471
+node_MAZTERTD:
+  @cpy 5659 port_mul
+  @cpy 1 portnum
+  @cpy &node_MAZTERTD_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_MAZTERTD_outputs outputs_addr
+@jmp &run_node
+@raw node_MAZTERTD_ports:1 74567
+@raw node_MAZTERTD_outputs:24 60167
+node_HBKSNAEW:
+  @cpy 53381 port_mul
+  @cpy 1 portnum
+  @cpy &node_HBKSNAEW_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 7 outputnum
+  @cpy &node_HBKSNAEW_outputs outputs_addr
+@jmp &run_node
+@raw node_HBKSNAEW_ports:1 1
+@raw node_HBKSNAEW_outputs:24 120334 21 1693 36 6581 16 22798 49 224097 26 57373 9 97073
+node_BOMMKQFD:
+  @cpy 43597 port_mul
+  @cpy 1 portnum
+  @cpy &node_BOMMKQFD_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 0 outputnum
+  @cpy &node_BOMMKQFD_outputs outputs_addr
+@jmp &run_node
+@raw node_BOMMKQFD_ports:1 1718
+@raw node_BOMMKQFD_outputs:
+node_YKACNHBP:
+  @cpy 57383 port_mul
+  @cpy 2 portnum
+  @cpy &node_YKACNHBP_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_YKACNHBP_outputs outputs_addr
+@jmp &run_node
+@raw node_YKACNHBP_ports:0 0 0 0
+@raw node_YKACNHBP_outputs:11 27106
+node_CCNTGEUI:
+  @cpy 33773 port_mul
+  @cpy 5 portnum
+  @cpy &node_CCNTGEUI_ports ports_addr
+  @cpy &logicfn_add logic_addr
+  @cpy 1 outputnum
+  @cpy &node_CCNTGEUI_outputs outputs_addr
+@jmp &run_node
+@raw node_CCNTGEUI_ports:0 0 0 0 0 0 0 0 0 0
+@raw node_CCNTGEUI_outputs:33 57383
+node_RRJBYIVF:
+  @cpy 88471 port_mul
+  @cpy 4 portnum
+  @cpy &node_RRJBYIVF_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_RRJBYIVF_outputs outputs_addr
+@jmp &run_node
+@raw node_RRJBYIVF_ports:0 0 0 0 0 0 0 0
+@raw node_RRJBYIVF_outputs:29 255785
+node_RWHOZHQI:
+  @cpy 77983 port_mul
+  @cpy 1 portnum
+  @cpy &node_RWHOZHQI_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_RWHOZHQI_outputs outputs_addr
+@jmp &run_node
+@raw node_RWHOZHQI_ports:1 -14
+@raw node_RWHOZHQI_outputs:49 149398
+node_ZOQGLTLK:
+  @cpy 59387 port_mul
+  @cpy 2 portnum
+  @cpy &node_ZOQGLTLK_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_ZOQGLTLK_outputs outputs_addr
+@jmp &run_node
+@raw node_ZOQGLTLK_ports:0 0 0 0
+@raw node_ZOQGLTLK_outputs:32 252897
+node_DPMRMZXY:
+  @cpy 67153 port_mul
+  @cpy 1 portnum
+  @cpy &node_DPMRMZXY_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_DPMRMZXY_outputs outputs_addr
+@jmp &run_node
+@raw node_DPMRMZXY_ports:1 2731
+@raw node_DPMRMZXY_outputs:49 74699
+node_LHLEJKTI:
+  @cpy 12757 port_mul
+  @cpy 1 portnum
+  @cpy &node_LHLEJKTI_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_LHLEJKTI_outputs outputs_addr
+@jmp &run_node
+@raw node_LHLEJKTI_ports:1 56
+@raw node_LHLEJKTI_outputs:26 114746
+node_GNSGUDPI:
+  @cpy 103997 port_mul
+  @cpy 1 portnum
+  @cpy &node_GNSGUDPI_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_GNSGUDPI_outputs outputs_addr
+@jmp &run_node
+@raw node_GNSGUDPI_ports:1 1279
+@raw node_GNSGUDPI_outputs:9 194146
+node_LYLUMECL:
+  @cpy 69467 port_mul
+  @cpy 1 portnum
+  @cpy &node_LYLUMECL_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_LYLUMECL_outputs outputs_addr
+@jmp &run_node
+@raw node_LYLUMECL_ports:1 223
+@raw node_LYLUMECL_outputs:26 172119
+node_NSFKTMDZ:
+  @cpy 6581 port_mul
+  @cpy 2 portnum
+  @cpy &node_NSFKTMDZ_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_NSFKTMDZ_outputs outputs_addr
+@jmp &run_node
+@raw node_NSFKTMDZ_ports:0 0 0 0
+@raw node_NSFKTMDZ_outputs:16 11399
+node_OZKHBFDD:
+  @cpy 97073 port_mul
+  @cpy 3 portnum
+  @cpy &node_OZKHBFDD_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_OZKHBFDD_outputs outputs_addr
+@jmp &run_node
+@raw node_OZKHBFDD_ports:0 0 0 0 0 0
+@raw node_OZKHBFDD_outputs:20 33773
+node_GMNNXIYD:
+  @cpy 51157 port_mul
+  @cpy 6 portnum
+  @cpy &node_GMNNXIYD_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_GMNNXIYD_outputs outputs_addr
+@jmp &run_node
+@raw node_GMNNXIYD_ports:0 0 0 0 0 0 0 0 0 0 0 0
+@raw node_GMNNXIYD_outputs:27 160382
+node_EZWROFYJ:
+  @cpy 57493 port_mul
+  @cpy 1 portnum
+  @cpy &node_EZWROFYJ_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_EZWROFYJ_outputs outputs_addr
+@jmp &run_node
+@raw node_EZWROFYJ_ports:1 -4649
+@raw node_EZWROFYJ_outputs:25 104297
+node_HUHKSJUM:
+  @cpy 88469 port_mul
+  @cpy 1 portnum
+  @cpy &node_HUHKSJUM_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 3 outputnum
+  @cpy &node_HUHKSJUM_outputs outputs_addr
+@jmp &run_node
+@raw node_HUHKSJUM_ports:1 3
+@raw node_HUHKSJUM_outputs:10 40283 2 49957 2 149871
+node_TRCZDKKE:
+  @cpy 75967 port_mul
+  @cpy 1 portnum
+  @cpy &node_TRCZDKKE_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_TRCZDKKE_outputs outputs_addr
+@jmp &run_node
+@raw node_TRCZDKKE_ports:1 11
+@raw node_TRCZDKKE_outputs:10 281981
+node_BTPXCPTY:
+  @cpy 80191 port_mul
+  @cpy 2 portnum
+  @cpy &node_BTPXCPTY_ports ports_addr
+  @cpy &logicfn_intdiv logic_addr
+  @cpy 1 outputnum
+  @cpy &node_BTPXCPTY_outputs outputs_addr
+@jmp &run_node
+@raw node_BTPXCPTY_ports:0 0 0 0
+@raw node_BTPXCPTY_outputs:255 98377
+node_BMDQPHCF:
+  @cpy 93463 port_mul
+  @cpy 1 portnum
+  @cpy &node_BMDQPHCF_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_BMDQPHCF_outputs outputs_addr
+@jmp &run_node
+@raw node_BMDQPHCF_ports:1 4
+@raw node_BMDQPHCF_outputs:25 208594
+node_MVJHSHKD:
+  @cpy 104173 port_mul
+  @cpy 3 portnum
+  @cpy &node_MVJHSHKD_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_MVJHSHKD_outputs outputs_addr
+@jmp &run_node
+@raw node_MVJHSHKD_ports:0 0 0 0 0 0
+@raw node_MVJHSHKD_outputs:32 337196
+node_UOSLWXXT:
+  @cpy 1693 port_mul
+  @cpy 2 portnum
+  @cpy &node_UOSLWXXT_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_UOSLWXXT_outputs outputs_addr
+@jmp &run_node
+@raw node_UOSLWXXT_ports:0 0 0 0
+@raw node_UOSLWXXT_outputs:36 13162
+node_GLISRJRS:
+  @cpy 60167 port_mul
+  @cpy 2 portnum
+  @cpy &node_GLISRJRS_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_GLISRJRS_outputs outputs_addr
+@jmp &run_node
+@raw node_GLISRJRS_ports:0 0 0 0
+@raw node_GLISRJRS_outputs:21 3386
+node_FNZPQQKE:
+  @cpy 4657 port_mul
+  @cpy 1 portnum
+  @cpy &node_FNZPQQKE_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_FNZPQQKE_outputs outputs_addr
+@jmp &run_node
+@raw node_FNZPQQKE_ports:1 125
+@raw node_FNZPQQKE_outputs:23 353884
+node_VQPKLSNN:
+  @cpy 69379 port_mul
+  @cpy 1 portnum
+  @cpy &node_VQPKLSNN_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 0 outputnum
+  @cpy &node_VQPKLSNN_outputs outputs_addr
+@jmp &run_node
+@raw node_VQPKLSNN_ports:1 1924
+@raw node_VQPKLSNN_outputs:
+node_YPWLNLLX:
+  @cpy 98893 port_mul
+  @cpy 1 portnum
+  @cpy &node_YPWLNLLX_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_YPWLNLLX_outputs outputs_addr
+@jmp &run_node
+@raw node_YPWLNLLX_ports:1 419
+@raw node_YPWLNLLX_outputs:15 30977
+node_FMKLPDUD:
+  @cpy 98377 port_mul
+  @cpy 1 portnum
+  @cpy &node_FMKLPDUD_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 6 outputnum
+  @cpy &node_FMKLPDUD_outputs outputs_addr
+@jmp &run_node
+@raw node_FMKLPDUD_ports:1 25523
+@raw node_FMKLPDUD_outputs:13 118774 30 10691 30 21382 37 104173 37 208346 37 312519
+node_IWFDXHPB:
+  @cpy 30977 port_mul
+  @cpy 4 portnum
+  @cpy &node_IWFDXHPB_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_IWFDXHPB_outputs outputs_addr
+@jmp &run_node
+@raw node_IWFDXHPB_ports:0 0 0 0 0 0 0 0
+@raw node_IWFDXHPB_outputs:20 67546
+node_RKHWMQPP:
+  @cpy 44171 port_mul
+  @cpy 1 portnum
+  @cpy &node_RKHWMQPP_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 2 outputnum
+  @cpy &node_RKHWMQPP_outputs outputs_addr
+@jmp &run_node
+@raw node_RKHWMQPP_ports:1 17
+@raw node_RKHWMQPP_outputs:10 120849 2 249785
+node_WMGFSCPK:
+  @cpy 1669 port_mul
+  @cpy 1 portnum
+  @cpy &node_WMGFSCPK_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 9 outputnum
+  @cpy &node_WMGFSCPK_outputs outputs_addr
+@jmp &run_node
+@raw node_WMGFSCPK_ports:1 2
+@raw node_WMGFSCPK_outputs:10 201415 25 312891 15 61954 15 92931 33 114766 11 40659 2 199828 29 102314 29 204628
+node_CAXKJTYL:
+  @cpy 57373 port_mul
+  @cpy 3 portnum
+  @cpy &node_CAXKJTYL_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_CAXKJTYL_outputs outputs_addr
+@jmp &run_node
+@raw node_CAXKJTYL_ports:0 0 0 0 0 0
+@raw node_CAXKJTYL_outputs:20 135092
+node_MFXCAOQF:
+  @cpy 40283 port_mul
+  @cpy 7 portnum
+  @cpy &node_MFXCAOQF_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_MFXCAOQF_outputs outputs_addr
+@jmp &run_node
+@raw node_MFXCAOQF_ports:0 0 0 0 0 0 0 0 0 0 0 0 0 0
+@raw node_MFXCAOQF_outputs:32 168598
+node_LZFYUOHE:
+  @cpy 74699 port_mul
+  @cpy 3 portnum
+  @cpy &node_LZFYUOHE_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_LZFYUOHE_outputs outputs_addr
+@jmp &run_node
+@raw node_LZFYUOHE_ports:0 0 0 0 0 0
+@raw node_LZFYUOHE_outputs:20 168865
+node_RWZRAXLH:
+  @cpy 1499 port_mul
+  @cpy 1 portnum
+  @cpy &node_RWZRAXLH_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_RWZRAXLH_outputs outputs_addr
+@jmp &run_node
+@raw node_RWZRAXLH_ports:1 2879
+@raw node_RWZRAXLH_outputs:11 13553
+node_PHEPEQFX:
+  @cpy 53197 port_mul
+  @cpy 1 portnum
+  @cpy &node_PHEPEQFX_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_PHEPEQFX_outputs outputs_addr
+@jmp &run_node
+@raw node_PHEPEQFX_ports:1 13
+@raw node_PHEPEQFX_outputs:9 291219
+node_PYUKMSUS:
+  @cpy 11399 port_mul
+  @cpy 2 portnum
+  @cpy &node_PYUKMSUS_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_PYUKMSUS_outputs outputs_addr
+@jmp &run_node
+@raw node_PYUKMSUS_ports:0 0 0 0
+@raw node_PYUKMSUS_outputs:10 241698
+node_YKJBHDLR:
+  @cpy 13997 port_mul
+  @cpy 1 portnum
+  @cpy &node_YKJBHDLR_ports ports_addr
+  @cpy &logicfn_copy logic_addr
+  @cpy 1 outputnum
+  @cpy &node_YKJBHDLR_outputs outputs_addr
+@jmp &run_node
+@raw node_YKJBHDLR_ports:1 -167
+@raw node_YKJBHDLR_outputs:2 99914
+node_KUPDPQGA:
+  @cpy 104297 port_mul
+  @cpy 3 portnum
+  @cpy &node_KUPDPQGA_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_KUPDPQGA_outputs outputs_addr
+@jmp &run_node
+@raw node_KUPDPQGA_ports:0 0 0 0 0 0
+@raw node_KUPDPQGA_outputs:20 101319
+node_FRVWOLLO:
+  @cpy 84299 port_mul
+  @cpy 4 portnum
+  @cpy &node_FRVWOLLO_ports ports_addr
+  @cpy &logicfn_add logic_addr
+  @cpy 1 outputnum
+  @cpy &node_FRVWOLLO_outputs outputs_addr
+@jmp &run_node
+@raw node_FRVWOLLO_ports:0 0 0 0 0 0 0 0
+@raw node_FRVWOLLO_outputs:27 80191
+node_KGCRTBKS:
+  @cpy 49957 port_mul
+  @cpy 5 portnum
+  @cpy &node_KGCRTBKS_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_KGCRTBKS_outputs outputs_addr
+@jmp &run_node
+@raw node_KGCRTBKS_ports:0 0 0 0 0 0 0 0 0 0
+@raw node_KGCRTBKS_outputs:30 32073
+node_EWCHJNNC:
+  @cpy 13553 port_mul
+  @cpy 3 portnum
+  @cpy &node_EWCHJNNC_ports ports_addr
+  @cpy &logicfn_mul logic_addr
+  @cpy 1 outputnum
+  @cpy &node_EWCHJNNC_outputs outputs_addr
+@jmp &run_node
+@raw node_EWCHJNNC_ports:0 0 0 0 0 0
+@raw node_EWCHJNNC_outputs:13 59387

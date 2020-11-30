@@ -1,0 +1,242 @@
+in tmp
+# add so modes are preserved
+add tmp branch branch
+
+# jt 1 &p2_entry <...skipped...>
+# --or--
+# add 1 &p2_entry tmp
+branch:0 1 &p2_entry tmp
+
+# manual 'out <imm>' test
+out 0
+
+add 46 pos2:82 tmp
+mul 22 pos6:80 tmp
+add 52 pos0:34 tmp
+mul 14 pos4:65 tmp
+add 49 pos7:92 tmp
+add pos1 18 test
+add test -47 test
+out test
+mul acc 8 acc
+add test 6 test
+add acc test acc
+add pos1:29 24 tmp
+mul 69 pos4 test
+add -4485 test test
+out test
+mul 8 acc acc
+add test 7 test
+add test acc acc
+add pos2 pos3 test
+add -100 test test
+out test
+mul acc 8 acc
+add test 7 test
+add test acc acc
+add 92 pos0 test
+add -126 test test
+out test
+mul 8 acc acc
+add 1 test test
+add acc test acc
+mul pos5 91 test
+add -3003 test test
+out test
+mul 8 acc acc
+add 1 test test
+add acc test acc
+mul 32 14 test
+add -448 test test
+out test
+mul 8 acc acc
+add test 3 test
+add acc test acc
+mul pos6 pos7 test
+add -7360 test test
+out test
+mul acc 8 acc
+add 5 test test
+add acc test acc
+add 9 pos3:18 tmp
+add 63 45 test
+add test -108 test
+out test
+mul 8 acc acc
+add test 4 test
+add test acc acc
+add 92 pos5:33 tmp
+
+out acc
+hlt
+@raw acc:0 test:0 tmp:0 p2_before:&p2_after zero:0 0 0 0 0 0 0 0 0 0 0
+
+p2_entry:
+
+# test every jump bug listed above, in order
+
+jt 0 99999
+jt &zero &p2_jumptest1
+jt 1 99999
+p2_jumptest1:
+
+jt zero 99999
+jt *0 &p2_jumptest2
+jt 1 99999
+p2_jumptest2:
+
+jf &zero 99999
+jf 0 &p2_jumptest3
+jt 1 99999
+p2_jumptest3:
+
+jf *0 99999
+jf zero &p2_jumptest4
+jt 1 99999
+p2_jumptest4:
+
+jt 1 &p2_jumptest5
+jt 1 99999
+p2_jumptest5:
+add tmp tmp tmp
+
+add &p2_jumptest6 0 *0
+jt 1 *0
+jt 1 99999
+p2_jumptest6:
+
+jf 0 &p2_jumptest7
+jt 1 99999
+p2_jumptest7:
+add tmp tmp tmp
+
+add &p2_jumptest8 0 *0
+jf 0 *0
+jt 1 99999
+p2_jumptest8:
+
+
+lt &p2_after &p2_after test
+mul acc 2 acc
+jf test &p2_posttest_1
+add acc 1 acc
+p2_posttest_1:
+lt p2_after &p2_after test
+mul 2 acc acc
+jf test &p2_posttest_6
+add acc 1 acc
+p2_posttest_6:
+lt &p2_before &p2_after test
+mul acc 2 acc
+jt test &p2_posttest_0
+add 1 acc acc
+p2_posttest_0:
+lt &p2_after &p2_before test
+mul acc 2 acc
+jf test &p2_posttest_2
+add 1 acc acc
+p2_posttest_2:
+eq &p2_after &p2_after test
+mul 2 acc acc
+jf test &p2_posttest_13
+add 1 acc acc
+p2_posttest_13:
+eq p2_before &p2_before test
+mul 2 acc acc
+jf test &p2_posttest_20
+add acc 1 acc
+p2_posttest_20:
+eq p2_after &p2_before test
+mul acc 2 acc
+jf test &p2_posttest_19
+add 1 acc acc
+p2_posttest_19:
+eq &p2_after &p2_before test
+mul 2 acc acc
+jt test &p2_posttest_14
+add 1 acc acc
+p2_posttest_14:
+lt p2_after &p2_before test
+mul acc 2 acc
+jt test &p2_posttest_7
+add acc 1 acc
+p2_posttest_7:
+lt &p2_before p2_before test
+mul 2 acc acc
+jf test &p2_posttest_3
+add 1 acc acc
+p2_posttest_3:
+eq p2_after p2_before test
+mul 2 acc acc
+jt test &p2_posttest_21
+add acc 1 acc
+p2_posttest_21:
+eq p2_after &p2_after test
+mul 2 acc acc
+jt test &p2_posttest_18
+add acc 1 acc
+p2_posttest_18:
+eq p2_before p2_after test
+mul acc 2 acc
+jt test &p2_posttest_23
+add 1 acc acc
+p2_posttest_23:
+lt p2_before &p2_before test
+mul 2 acc acc
+jt test &p2_posttest_8
+add 1 acc acc
+p2_posttest_8:
+eq &p2_before p2_before test
+mul acc 2 acc
+jf test &p2_posttest_15
+add 1 acc acc
+p2_posttest_15:
+eq &p2_before &p2_after test
+mul 2 acc acc
+jt test &p2_posttest_12
+add acc 1 acc
+p2_posttest_12:
+eq &p2_before p2_after test
+mul 2 acc acc
+jf test &p2_posttest_16
+add acc 1 acc
+p2_posttest_16:
+lt &p2_before p2_after test
+mul acc 2 acc
+jf test &p2_posttest_4
+add acc 1 acc
+p2_posttest_4:
+lt p2_before p2_before test
+mul 2 acc acc
+jt test &p2_posttest_10
+add 1 acc acc
+p2_posttest_10:
+eq &p2_after p2_after test
+mul acc 2 acc
+jf test &p2_posttest_17
+add acc 1 acc
+p2_posttest_17:
+lt p2_before p2_after test
+mul 2 acc acc
+jf test &p2_posttest_11
+add 1 acc acc
+p2_posttest_11:
+eq p2_after p2_after test
+mul acc 2 acc
+jf test &p2_posttest_22
+add 1 acc acc
+p2_posttest_22:
+lt p2_after p2_before test
+mul acc 2 acc
+jf test &p2_posttest_9
+add 1 acc acc
+p2_posttest_9:
+lt &p2_after p2_after test
+mul 2 acc acc
+jf test &p2_posttest_5
+add acc 1 acc
+p2_posttest_5:
+
+out acc
+hlt
+@raw p2_after:&p2_before

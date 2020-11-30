@@ -1,0 +1,126 @@
+rbo &auto__end
+
+in ~1
+@call &validate_input
+@call &abs
+@cpy ~1 x
+
+in one:~1
+@call &validate_input
+@call &abs
+@cpy one ~2
+@cpy ~1 ~3
+@cpy 1 ~1
+@call &mul_three
+@cpy ~1 y
+
+@cpy x ~3
+@cpy x ~2
+@cpy &abs ~1
+@call &call
+@cpy 150 ~2
+@call &mul_three
+@cpy ~1 eq_l
+
+@cpy y ~4
+@cpy &abs ~3
+@cpy &call ~2
+@cpy call_ptr:&call ~1
+@call &call
+@cpy y ~3
+@cpy 61 ~2
+@call mul_three_ptr:&mul_three
+mul ~1 -1 ~1
+add eq_l ~1 ~1
+@call &abs
+@cpy ~1 eq_l
+
+@cpy x ~4
+@cpy y ~3
+@cpy 14 ~2
+add mul_three_ptr -2 tmp
+mul tmp 2 tmp
+add tmp 3 tmp
+mul mul_three_ptr -1 mul_three_ptr
+add tmp mul_three_ptr tmp
+add tmp 1 ~1
+@call call_ptr
+
+lt ~1 eq_l ~2
+# ~2: !hit
+@cpy one ~1
+@cpy -1 ~3
+@call &mul_three
+add 1 ~1 ~1
+out ~1
+
+hlt
+
+@raw x:0 y:0 eq_l:0 tmp:0
+
+@fn 1 call(fn, a, b, c)
+  @cpy fn fnaddr
+
+  @cpy a ~1
+  @cpy b ~2
+  @cpy c ~3
+  @call fnaddr:&call
+  @cpy ~1 return0
+@endfn
+
+@fn 1 abs(v) local(tmp)
+  lt 0 v tmp
+  # tmp: positive=1, else=0
+  mul tmp 2 tmp
+  # tmp: positive=2, else=0
+  add tmp -1 tmp
+  # tmp: positive=1, else=-1
+  mul tmp v return0
+@endfn
+
+@fn 1 validate_input(v) local(tmp)
+  lt v 0 tmp
+  # tmp: neg=1, else=0
+  jf tmp &return
+    out 0
+    hlt
+  return:
+  @cpy v return0
+@endfn
+
+@fn 1 mul_three(a,b,c) local(tmp)
+  lt b a tmp
+  jf tmp &no_ab_sort
+    add a b a
+    mul b -1 tmp
+    add a tmp ~2
+    mul ~2 -1 tmp
+    add a tmp ~1
+    @cpy c ~3
+    @call &mul_three
+    @jmp &return
+  no_ab_sort:
+
+  lt c b tmp
+  jf tmp &no_bc_sort
+    add b c b
+    mul c -1 tmp
+    add b tmp ~3
+    mul ~3 -1 tmp
+    add b tmp ~2
+    @cpy a ~1
+    @call &mul_three
+    @jmp &return
+  no_bc_sort:
+
+  mul a -1 a
+  add a b a
+  mul b c c
+  mul c a a
+  mul b c b
+  mul a -1 c
+  add b c ~1
+
+  return:
+  @cpy ~1 return0
+@endfn

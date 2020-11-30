@@ -1,0 +1,221 @@
+in color
+jt color &p2
+jf 0 &p1
+@raw color:0 steps:0 tmp:0
+
+p1:
+out 1
+out 0
+p1_loop:
+in color
+mul color -1 tmp
+add 1 tmp tmp
+out tmp
+eq color p1_lastcolor_0:1 tmp
+out tmp
+@cpy color p1_lastcolor_0
+add *1103 *2 tmp
+in color
+mul color -1 tmp
+add tmp 1 tmp
+out tmp
+eq color p1_lastcolor_1:1 tmp
+out tmp
+@cpy color p1_lastcolor_1
+in color
+mul -1 color tmp
+add 1 tmp tmp
+out tmp
+eq p1_lastcolor_2:0 color tmp
+out tmp
+@cpy color p1_lastcolor_2
+add *1 *4 tmp
+jf *0 17
+add *1108 *13 tmp
+in color
+mul color -1 tmp
+add tmp 1 tmp
+out tmp
+eq color p1_lastcolor_3:1 tmp
+out tmp
+@cpy color p1_lastcolor_3
+jf *0 44
+add *1107 *2 tmp
+jf *0 31
+in color
+mul -1 color tmp
+add tmp 1 tmp
+out tmp
+eq p1_lastcolor_4:1 color tmp
+out tmp
+@cpy color p1_lastcolor_4
+in color
+mul -1 color tmp
+add 1 tmp tmp
+out tmp
+eq p1_lastcolor_5:0 color tmp
+out tmp
+@cpy color p1_lastcolor_5
+jf *0 57
+jf *0 93
+add *105 *7 tmp
+in color
+mul -1 color tmp
+add 1 tmp tmp
+out tmp
+eq p1_lastcolor_6:0 color tmp
+out tmp
+@cpy color p1_lastcolor_6
+add *101 *15 tmp
+jf *0 22
+jf *0 31
+mul *1101 *18 tmp
+in color
+mul -1 color tmp
+add tmp 1 tmp
+out tmp
+eq p1_lastcolor_7:0 color tmp
+out tmp
+@cpy color p1_lastcolor_7
+jf *0 7
+mul *2 *8 tmp
+in color
+mul -1 color tmp
+add 1 tmp tmp
+out tmp
+eq p1_lastcolor_8:0 color tmp
+out tmp
+@cpy color p1_lastcolor_8
+jf *0 96
+in color
+mul -1 color tmp
+add tmp 1 tmp
+out tmp
+eq p1_lastcolor_9:1 color tmp
+out tmp
+@cpy color p1_lastcolor_9
+mul *1007 *12 tmp
+add 1 steps steps
+lt steps 978 tmp
+jt tmp &p1_loop
+hlt
+
+p2:
+rbo &auto__end
+out 0
+out 1
+
+@cpy 838480007196 ~1
+@call &drawstrip
+@cpy 825326588684 ~1
+@call &drawstrip
+
+# paint 0 for all of: right left right right left right
+in tmp
+out 0
+out 1
+in tmp
+out 0
+out 0
+in tmp
+out 0
+out 1
+in tmp
+out 0
+out 1
+in tmp
+out 0
+out 0
+in tmp
+out 0
+out 1
+
+@cpy 235173678083 ~1
+@call &drawstrip
+@cpy 206199418051 ~1
+@call &drawstrip
+
+# paint 0 for all of: left left
+in tmp
+out 0
+out 0
+in tmp
+out 0
+out 0
+
+@cpy 709584748904 ~1
+@call &drawstrip
+@cpy 988224987916 ~1
+@call &drawstrip
+
+hlt
+@fn 0 drawstrip(v) global(_drawstrip_bit, bitscan)
+  @cpy v ~1
+  @cpy 40 ~2
+  @cpy &_drawstrip_bit ~3
+  @call &bitscan
+@endfn
+
+@raw drawstrip_step:0 drawstrip_dir:1 0 0 1
+@fn 0 _drawstrip_bit(bit) global(tmp, drawstrip_dir, drawstrip_step)
+  in tmp
+  out bit
+
+  add drawstrip_step &drawstrip_dir dir
+  out dir:*0
+
+  add drawstrip_step 1 drawstrip_step
+  eq 4 drawstrip_step tmp
+  jf tmp &step_update_done
+  @cpy 0 drawstrip_step
+  step_update_done:
+@endfn
+
+# bitscan: call cb(bit) for each of the low numbits of non-negative v, high-to-low
+@raw _bitscan_cb:0
+@fn 0 bitscan(v, numbits, cb) global(tmp, _bitscan, _bitscan_cb)
+  @cpy cb _bitscan_cb
+  lt v 0 tmp
+  jf tmp &nonnegative
+    @cpy 0 v
+  nonnegative:
+  @cpy v ~1
+  @cpy numbits ~2
+  @cpy 1 ~3
+  @call &_bitscan
+@endfn
+
+@fn 1 _bitscan(v, depth, exp2) local(bit) global(tmp, _bitscan_cb)
+  lt depth 1 tmp
+  jf tmp &recurse
+  lt v exp2 tmp
+  jf tmp &recurse
+    @cpy v return0
+    @jmp &return
+
+  recurse:
+  @cpy v ~1
+  add depth -1 ~2
+  mul exp2 2 ~3
+  @call &_bitscan
+  @cpy ~1 v
+
+  @cpy 1 bit
+  lt v exp2 tmp
+  jf tmp &bit_ready
+    @cpy 0 bit
+
+  bit_ready:
+  mul exp2 bit exp2
+
+  lt 0 depth tmp
+  jf tmp &report_done
+    @cpy bit ~1
+    @call _bitscan_cb
+
+  report_done:
+  mul exp2 -1 exp2
+  add v exp2 return0
+
+  return:
+@endfn

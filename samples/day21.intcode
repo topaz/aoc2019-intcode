@@ -1,0 +1,575 @@
+rbo &auto__end
+
+
+@cpy &str_input_instructions ~1
+@call &print
+
+read_instruction:
+
+# read 0+ spaces
+@call &in_skip_whitespace
+
+# first char AONWR
+@call &in
+eq ~1 'A' tmp
+jt tmp &read_and
+eq ~1 'O' tmp
+jt tmp &read_or
+eq ~1 'N' tmp
+jt tmp &read_not
+eq ~1 'W' tmp
+jt tmp &read_walk
+eq ~1 'R' tmp
+jt tmp &read_run
+@cpy &str_unknown_op ~1
+@call &die
+
+# finish word
+#   if walk/run, read newline, end, maybe set p2 flag
+
+read_and:
+@cpy 'N' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 'D' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 1 op
+@jmp &read_op_done
+
+read_or:
+@cpy 'R' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 2 op
+@jmp &read_op_done
+
+read_not:
+@cpy 'O' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 'T' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 3 op
+@jmp &read_op_done
+
+read_walk:
+@cpy 'A' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 'L' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 'K' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@call &in_skip_whitespace
+@cpy '\n' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@jmp &read_done
+
+read_run:
+@cpy 'U' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 'N' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@call &in_skip_whitespace
+@cpy '\n' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@cpy 1 p2
+@jmp &read_done
+
+read_op_done:
+# read 1+ spaces
+@cpy '\s' ~1
+@cpy &str_unknown_op ~2
+@call &in_or_die
+@call &in_skip_whitespace
+
+# read A-I, J, T
+#   if E-I, set flag
+@call &in
+@cpy ~1 char
+@cpy 'A' ~2
+@cpy 'I' ~3
+@call &val_in_range
+jf ~1 &read_arg1_not_offset
+  lt char 'E' tmp
+  jt tmp &p2_check_done
+    @cpy 1 used_p2_features
+  p2_check_done:
+  add char -64 arg1
+  @jmp &read_arg1_done
+read_arg1_not_offset:
+eq char 'J' tmp
+jf tmp &read_arg1_not_j
+  @cpy -1 arg1
+  @jmp &read_arg1_done
+read_arg1_not_j:
+eq char 'T' tmp
+jf tmp &read_arg1_invalid
+  @cpy -2 arg1
+  @jmp &read_arg1_done
+read_arg1_invalid:
+@cpy &str_unknown_arg1 ~1
+@call &die
+read_arg1_done:
+
+# read 1+ spaces
+@cpy '\s' ~1
+@cpy &str_unknown_arg1 ~2
+@call &in_or_die
+@call &in_skip_whitespace
+
+# read J, T
+@call &in
+@cpy ~1 char
+eq char 'J' tmp
+jf tmp &read_arg2_not_j
+  @cpy -1 arg2
+  @jmp &read_arg2_done
+read_arg2_not_j:
+eq char 'T' tmp
+jf tmp &read_arg2_invalid
+  @cpy -2 arg2
+  @jmp &read_arg2_done
+read_arg2_invalid:
+@cpy &str_unknown_arg2 ~1
+@call &die
+read_arg2_done:
+
+# read 0+ spaces
+@call &in_skip_whitespace
+
+# read newline
+@cpy '\n' ~1
+@cpy &str_unknown_arg2 ~2
+@call &in_or_die
+
+# save instruction or die if out of memory
+lt userfn_len 15 tmp
+jt tmp &read_save_instruction
+@cpy &str_out_of_memory ~1
+@call &die
+read_save_instruction:
+
+mul userfn_len 3 userfn_write_op_addr
+add userfn_write_op_addr &userfn userfn_write_op_addr
+@cpy op userfn_write_op_addr:*0
+add userfn_write_op_addr 1 userfn_write_arg1_addr
+@cpy arg1 userfn_write_arg1_addr:*0
+add userfn_write_arg1_addr 1 userfn_write_arg2_addr
+@cpy arg2 userfn_write_arg2_addr:*0
+
+add userfn_len 1 userfn_len
+
+@jmp &read_instruction
+
+read_done:
+
+# if p1, die if any E-I were used
+jt p2 &init_p2
+#init_p1
+  jf used_p2_features &p1_ok
+    @cpy &str_unknown_arg1 ~1
+    @call &die
+  p1_ok:
+  @cpy &str_init_p1 ~1
+  @jmp &init_done
+init_p2:
+  @cpy &str_init_p2 ~1
+init_done:
+@call &print
+
+
+### main
+
+@cpy &trials trial_addr
+
+mainloop:
+@cpy trial_addr:*0 trial_v
+jf trial_v &done
+
+@cpy trial_v ~1
+@call &write_ground
+
+@cpy 0 ~1
+@call &run
+jt ~1 &trial_ok
+  @cpy &str_trial_failed ~1
+  @call &print
+  @cpy 1 ~1
+  @call &run
+  hlt
+trial_ok:
+
+mainloop_resume:
+add trial_addr 1 trial_addr
+@jmp &mainloop
+
+done:
+jf p2 &killscreen
+  @cpy 0 p2
+  @jmp &mainloop_resume
+
+killscreen:
+out score
+hlt
+
+
+@fn 0 write_ground(v) global(ground_inner, ground_addr, _write_ground_bit, bitscan)
+  @cpy &ground_inner ground_addr
+  @cpy v ~1
+  @cpy 9 ~2
+  @cpy &_write_ground_bit ~3
+  @call &bitscan
+@endfn
+
+@fn 0 _write_ground_bit(bit) global(ground_addr)
+  @cpy ground_addr ground_write_addr
+  @cpy bit ground_write_addr:*0
+  add ground_addr 1 ground_addr
+@endfn
+
+@raw ground_start:1 1 1 1 1 1 1 1 1 1
+@raw ground_inner:0 0 0 0 0 0 0 0 0
+# ground suffix
+@raw 1 1 1 1 1 1 1 1 1 1 1 1 1
+
+@raw tmp:0 char:0 op:0 arg1:0 arg2:0 trial_v:0 score:0 p2:0 used_p2_features:0 ground_addr:0
+
+@raw trials:255 63 223 95 191 159 127 0
+@raw 108 175 253 101 232 76 188 93 138 172 214 177 124 238 126 205 244 34 185 207 69 106 216 198 109 154 123 43 35 234 136 169 71 54 189 245 118 222 202 215 110 51 55 181 228 254 59 249 141 187 98 102 217 152 85 119 241 179 247 171 68 157 201 78 231 62 206 113 87 166 239 203 103 229 116 60 47 235 184 236 196 243 170 182 137 46 248 246 57 155 39 79 99 114 140 77 174 92 139 242 237 38 125 94 230 199 49 42 197 233 162 61 219 212 218 186 86 251 227 115 178 173 107 58 153 117 204 163 200 226 111 56 168 122 213 50 143 70 84 167 100 120 252 121 183 158 142 220 250 53 156 190 221 0
+
+@raw userfn_len:0
+@raw userfn:0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+#AND:1 OR:2 NOT:3, A-I:1-9, J:-1, T:-2
+#@raw userfn_len:4
+#@raw userfn:3 3 -1   1 4 -1   3 1 -2   2 -2 -1
+
+@str str_input_instructions:"Input instructions:\n"
+@str str_init_p1:"\nWalking...\n\n"
+@str str_init_p2:"\nRunning...\n\n"
+@str str_trial_failed:"\nDidn't make it across:\n\n"
+@str str_unknown_op:"Invalid operation; expected something like AND, OR, or NOT"
+@str str_unknown_arg1:"Invalid first argument; expected something like A, B, C, D, J, or T"
+@str str_unknown_arg2:"Invalid second argument; expected J or T"
+@str str_out_of_memory:"Out of memory; at most 15 instructions can be stored"
+
+@raw peek_last:0
+@fn 1 in_peek() global(peek_last)
+  jt peek_last &have_char
+    in peek_last
+  have_char:
+
+  @cpy peek_last return0
+@endfn
+
+@fn 1 in() global(in_peek, peek_last)
+  @call &in_peek
+
+  @cpy peek_last return0
+  @cpy 0 peek_last
+@endfn
+
+@fn 0 in_or_die(req_char, err_addr) local(in_char,tmp) global(in, die)
+  @call &in
+  @cpy ~1 in_char
+  eq in_char req_char tmp
+  jt tmp &return
+    @cpy err_addr ~1
+    @call &die
+  return:
+@endfn
+
+@fn 0 in_skip_whitespace() local(tmp) global(in_peek,in)
+  next_char:
+  @call &in_peek
+  eq ~1 32 tmp
+  jt tmp &skip
+  eq ~1 9 tmp
+  jt tmp &skip
+  @jmp &return
+
+  skip:
+  @call &in
+  @jmp &next_char
+
+  return:
+@endfn
+
+@fn 0 print(str_addr) local(i, len, tmp)
+  @cpy str_addr len_read
+  @cpy len_read:*0 len
+  add 1 str_addr str_addr
+  @cpy 0 i
+  read_loop:
+    eq i len tmp
+    jt tmp &return
+    add str_addr i chr_read
+    out chr_read:*0
+    add i 1 i
+    @jmp &read_loop
+  return:
+@endfn
+
+@fn 0 die(str_addr) global(print)
+  out '\n'
+  @cpy str_addr ~1
+  @call &print
+  out '\n'
+  hlt
+@endfn
+
+@fn 0 update_score(player_x) local(tmp) global(score, trial_addr, trial_v)
+  mul trial_addr trial_v tmp
+  mul tmp player_x tmp
+  add tmp score score
+@endfn
+
+@fn 1 run(want_draw) local(tmp, x, y, player_x, player_y, player_jumptimer, player_aboveground, player_grounded) global(ground_start, want_jump, update_score)
+  @cpy 5 player_x
+  @cpy 1 player_y
+  @cpy 0 player_jumptimer
+
+  mainloop:
+
+  ### draw
+  jf want_draw &draw_done
+  @cpy 3 y
+  draw_y:
+    @cpy 5 x
+    draw_x:
+      eq x player_x tmp
+      jf tmp &draw_notplayer
+      eq y player_y tmp
+      jf tmp &draw_notplayer
+        out '@'
+        @jmp &draw_glyph_done
+      draw_notplayer:
+      jt y &draw_sky
+        add x &ground_start draw_glyph_addr
+        # 0=>46(.), 1=>35(#)
+        mul draw_glyph_addr:*0 -11 tmp
+        add tmp '.' tmp
+        out tmp
+        @jmp &draw_glyph_done
+      draw_sky:
+        out '.'
+
+      draw_glyph_done:
+    add x 1 x
+    lt x 22 tmp
+    jt tmp &draw_x
+
+    out '\n'
+  add y -1 y
+  lt y 0 tmp
+  jf tmp &draw_y
+
+  out '\n'
+  draw_done:
+  ###/draw
+
+  lt player_y 1 tmp
+  jf tmp &death_done
+    @cpy 0 return0
+    @jmp &return
+  death_done:
+
+  eq player_x 21 tmp
+  jf tmp &win_done
+    @cpy 1 return0
+    @jmp &return
+  win_done:
+
+  add player_x &ground_start aboveground_test_addr
+  @cpy aboveground_test_addr:*0 player_aboveground
+
+  eq player_y 1 player_grounded
+  mul player_aboveground player_grounded player_grounded
+
+  jt player_aboveground &score_done
+    @cpy player_x ~1
+    @call &update_score
+  score_done:
+
+  jf player_grounded &jump_done
+    @cpy player_x ~1
+    @call &want_jump
+    jf ~1 &jump_done
+    @cpy 2 player_jumptimer
+  jump_done:
+
+  lt 1 player_y tmp
+  add player_grounded tmp tmp
+  jf tmp &forward_done
+    add player_x 1 player_x
+  forward_done:
+
+  jf player_jumptimer &falling
+    add player_jumptimer -1 player_jumptimer
+    add player_y 1 player_y
+    @jmp &vertical_done
+  falling:
+    add player_y -1 player_y
+  vertical_done:
+
+  eq player_y 0 player_grounded
+  add player_x &ground_start suffocate_test_addr
+  mul suffocate_test_addr:*0 player_grounded player_grounded
+  jf player_grounded &groundsnap_done
+    @cpy 1 player_y
+  groundsnap_done:
+
+  @jmp &mainloop
+
+  return:
+@endfn
+
+#AND:1 OR:2 NOT:3, A-I:1-9, J:-1, T:-2
+@fn 1 want_jump(player_x) local(tmp, j, t, inst_i, inst, arg1, arg1_v, arg2, arg2_v) global(ground_start, userfn_len, userfn, val_in_range)
+  @cpy 0 inst_i
+  @cpy 0 j
+  @cpy 0 t
+
+  inst_loop:
+  eq inst_i userfn_len tmp
+  jt tmp &return
+
+  mul inst_i 3 tmp
+  add tmp &userfn inst_addr
+  @cpy inst_addr:*0 inst
+
+  add inst_addr 1 arg1_addr
+  @cpy arg1_addr:*0 arg1
+  @cpy arg1 ~1
+  @cpy 1 ~2
+  @cpy 9 ~3
+  @call &val_in_range
+  jf ~1 &arg1_not_offset
+    # arg1 is a-i
+    add player_x arg1 arg1_ground_addr
+    add arg1_ground_addr &ground_start arg1_ground_addr
+    @cpy arg1_ground_addr:*0 arg1_v
+    @jmp &arg1_done
+  arg1_not_offset:
+  eq arg1 -1 tmp
+  jf tmp &arg1_not_j
+    # arg1 is j
+    @cpy j arg1_v
+    @jmp &arg1_done
+  arg1_not_j:
+    # arg1 is t
+    @cpy t arg1_v
+  arg1_done:
+
+  add arg1_addr 1 arg2_addr
+  @cpy arg2_addr:*0 arg2
+  eq arg2 -1 tmp
+  jf tmp &arg2_not_j
+    # arg2 is j
+    @cpy j arg2_v
+    @jmp &arg2_done
+  arg2_not_j:
+    # arg2 is t
+    @cpy t arg2_v
+  arg2_done:
+
+  eq inst 1 tmp
+  jt tmp &inst_and
+  eq inst 2 tmp
+  jt tmp &inst_or
+
+  # inst_not
+    eq arg1_v 0 arg2_v
+  @jmp &inst_done
+
+  inst_and:
+    mul arg1_v arg2_v arg2_v
+  @jmp &inst_done
+
+  inst_or:
+    add arg1_v arg2_v arg2_v
+    lt 0 arg2_v arg2_v
+  @jmp &inst_done
+
+  inst_done:
+
+  eq arg2 -1 tmp
+  jf tmp &write_not_j
+    # arg2 is j
+    @cpy arg2_v j
+    @jmp &write_done
+  write_not_j:
+    # arg2 is t
+    @cpy arg2_v t
+  write_done:
+
+  add inst_i 1 inst_i
+  @jmp &inst_loop
+
+  return:
+  @cpy j return0
+@endfn
+
+@fn 1 val_in_range(v, min, max) local(low, high, tmp)
+  lt v min low
+  lt max v high
+  add low high tmp
+  eq tmp 0 return0
+@endfn
+
+# bitscan: call cb(bit) for each of the low numbits of non-negative v, high-to-low
+@raw _bitscan_cb:0
+@fn 0 bitscan(v, numbits, cb) local(tmp) global(_bitscan, _bitscan_cb)
+  @cpy cb _bitscan_cb
+  lt v 0 tmp
+  jf tmp &nonnegative
+    @cpy 0 v
+  nonnegative:
+  @cpy v ~1
+  @cpy numbits ~2
+  @cpy 1 ~3
+  @call &_bitscan
+@endfn
+
+@fn 1 _bitscan(v, depth, exp2) local(bit, tmp) global(_bitscan_cb)
+  lt depth 1 tmp
+  jf tmp &recurse
+  lt v exp2 tmp
+  jf tmp &recurse
+    @cpy v return0
+    @jmp &return
+
+  recurse:
+  @cpy v ~1
+  add depth -1 ~2
+  mul exp2 2 ~3
+  @call &_bitscan
+  @cpy ~1 v
+
+  @cpy 1 bit
+  lt v exp2 tmp
+  jf tmp &bit_ready
+    @cpy 0 bit
+
+  bit_ready:
+  mul exp2 bit exp2
+
+  lt 0 depth tmp
+  jf tmp &report_done
+    @cpy bit ~1
+    @call _bitscan_cb
+
+  report_done:
+  mul exp2 -1 exp2
+  add v exp2 return0
+
+  return:
+@endfn
